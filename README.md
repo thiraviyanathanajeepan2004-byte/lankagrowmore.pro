@@ -1,0 +1,1 @@
+# novainvesment.pro
