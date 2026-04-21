@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LGM Finance - Official v15</title>
+    <title>LGM Finance - Official v15 (Updated)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -99,19 +99,16 @@
                         <input type="file" id="photo_input" accept="image/*" class="no-print" onchange="previewPhoto(event)">
                     </div>
                 </div>
-
                 <div style="text-align: right; font-weight: bold;">
                     ID: <input type="text" id="ag_id_display" class="input-line" style="width: 100px;" readonly> <br>
                     Date: <span id="currentDate"></span>
                 </div>
-
                 <div class="section-title">1. வாடிக்கையாளர் தனிப்பட்ட விபரங்கள்</div>
                 முழுப் பெயர்: <input type="text" id="cust_name" class="en-cap input-line" style="width: 70%;"><br>
                 பிறந்த திகதி: <input type="date" id="cust_dob" class="input-line" style="width: 25%;" onchange="calcAge()"> 
                 வயது: <input type="text" id="cust_age" class="input-line" style="width: 10%;" readonly> 
                 NIC: <input type="text" id="cust_nic" class="en-cap input-line" style="width: 30%;"><br>
                 தொலைபேசி எண்: <input type="text" id="cust_phone" class="input-line" style="width: 40%;">
-
                 <div class="section-title">2. கடன் & வட்டி விபரங்கள்</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>கடன் அளவு: <input type="number" id="loan_amt" value="10000" class="input-line" onkeyup="calcAg()"></div>
@@ -119,13 +116,11 @@
                     <div>சேவை கட்டணம்: <input type="number" id="serv_chg" value="1000" class="input-line" onkeyup="calcAg()"></div>
                     <div>நாட்கள்: <input type="number" id="repay_period" value="30" class="input-line" onkeyup="calcAg()"></div>
                 </div>
-
                 <table class="data-table" style="margin-top: 20px;">
                     <tr style="background:#e3f2fd;"><td>கைக்கு கிடைக்கும் தொகை:</td><td id="ag_handover_disp">Rs. 0</td></tr>
                     <tr style="background:#fff9c4;"><td>நாளாந்த தவணை:</td><td id="ag_daily_disp">Rs. 0</td></tr>
                     <tr style="background:#e8f5e9;"><td>மொத்தமாக செலுத்த வேண்டியது:</td><td id="ag_total_disp">Rs. 0</td></tr>
                 </table>
-
                 <div class="section-title">3. பிணையாளர் (Guarantor)</div>
                 பிணையாளர் பெயர்: <input type="text" id="g_name" class="en-cap input-line" style="width: 80%;">
                 <div style="display: flex; justify-content: space-between; margin-top: 40px;">
@@ -174,7 +169,6 @@
     </div>
 
     <script>
-        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyCkxT7yrW_w8w8yzSy192wLAu6kdO7qu9E",
             authDomain: "lgm-finance.firebaseapp.com",
@@ -191,7 +185,6 @@
         let finance = { cap: 5000000, pass: "0530" };
         let loanChart, profitChart, currentBase64 = "";
 
-        // --- WhatsApp Messaging Helper ---
         function sendWhatsApp(phone, message) {
             if(!phone) return;
             let formattedPhone = phone.startsWith('0') ? "94" + phone.substring(1) : (phone.startsWith('94') ? phone : "94" + phone);
@@ -199,7 +192,6 @@
             window.open(url, '_blank');
         }
 
-        // --- Core Functions ---
         function login() {
             if(document.getElementById('u').value.toUpperCase() === "LGM2026" && document.getElementById('p').value === finance.pass) {
                 document.getElementById('loginOverlay').style.display = 'none';
@@ -258,17 +250,24 @@
             updateCharts(tL, tP, tProfit, tSC);
         }
 
+        // --- வசூல் செய்யும் போது மெசேஜ் அனுப்பும் பகுதி (மேம்படுத்தப்பட்டது) ---
         function collectPayment(dbId) {
-            let amt = prompt("தொகையை உள்ளிடவும்:");
-            if(amt && !isNaN(amt)) {
+            let amtInput = prompt("செலுத்தப்பட்ட தொகையை உள்ளிடவும் (Amount):");
+            if(amtInput && !isNaN(amtInput)) {
                 let c = customers.find(x => x.id.replace("/","_") === dbId);
-                let newPaid = (c.paid || 0) + parseFloat(amt);
-                let balance = c.total - newPaid;
+                let paidAmt = parseFloat(amtInput);
+                let newPaidTotal = (c.paid || 0) + paidAmt;
+                let remainingBalance = c.total - newPaidTotal;
 
-                db.ref('customers/' + dbId).update({ paid: newPaid, lastPaidDate: new Date().toISOString().split('T')[0] }).then(() => {
-                    alert("Payment Success!");
-                    // பந்தி வடிவிலான WhatsApp மெசேஜ்
-                    let msg = `அன்பார்ந்த வாடிக்கையாளர் ${c.name} அவர்களே, உங்களது LGM FINANCE கடனுக்காக இன்று ரூபா ${parseFloat(amt).toLocaleString()} வசூலிக்கப்பட்டுள்ளது. இதன்படி உங்களது தற்போதைய மொத்த நிலுவைத் தொகை ரூபா ${balance.toLocaleString()} ஆகும். எமது சேவையை நாடியமைக்கு நன்றி.`;
+                db.ref('customers/' + dbId).update({ 
+                    paid: newPaidTotal, 
+                    lastPaidDate: new Date().toISOString().split('T')[0] 
+                }).then(() => {
+                    alert("பணம் வெற்றிகரமாக சேர்க்கப்பட்டது!");
+                    
+                    // பந்தி வடிவிலான விரிவான மெசேஜ்
+                    let msg = `அன்பார்ந்த வாடிக்கையாளர் ${c.name} அவர்களே, \n\nஉங்களது LGM FINANCE (${c.id}) கடன் கணக்கிற்கு இன்று ரூபா ${paidAmt.toLocaleString()} வரவு வைக்கப்பட்டுள்ளது. \n\nஇதன்படி:\nமொத்தக் கடன்: ரூபா ${c.total.toLocaleString()}\nசெலுத்தப்பட்ட மொத்தத் தொகை: ரூபா ${newPaidTotal.toLocaleString()}\n\nதற்போதைய நிலுவைத் தொகை: ரூபா ${remainingBalance.toLocaleString()}\n\nஎமது சேவையை நாடியமைக்கு நன்றி.`;
+                    
                     sendWhatsApp(c.phone, msg);
                 });
             }
@@ -278,22 +277,35 @@
             let id = document.getElementById('ag_id_display').value;
             let name = document.getElementById('cust_name').value.toUpperCase();
             let phone = document.getElementById('cust_phone').value;
-            if(!name || !phone) return alert("Fill all!");
+            if(!name || !phone) return alert("தயவுசெய்து அனைத்து விபரங்களையும் பூர்த்தி செய்க!");
 
             let l = parseFloat(document.getElementById('loan_amt').value);
-            let total = parseFloat(document.getElementById('ag_total_disp').innerText.replace("Rs. ", ""));
+            let total = parseFloat(document.getElementById('ag_total_disp').innerText.replace("Rs. ", "").replace(/,/g, ""));
             let d = parseInt(document.getElementById('repay_period').value);
             let sc = parseFloat(document.getElementById('serv_chg').value);
             let daily = (total / d).toFixed(0);
 
             let data = { id, name, phone, loan: l, total, daily: total/d, sc, paid: 0, photo: currentBase64 };
             db.ref('customers/' + id.replace("/", "_")).set(data).then(() => {
-                alert("Agreement Saved!");
-                // பந்தி வடிவிலான WhatsApp மெசேஜ்
+                alert("ஒப்பந்தம் சேமிக்கப்பட்டது!");
                 let msg = `LGM FINANCE நிறுவனத்தில் ${name} ஆகிய நீங்கள் ${id} எனும் இலக்கத்தின் கீழ் ரூபா ${total.toLocaleString()} பெறுமதியான கடனைப் பெற்றுள்ளீர்கள். இக்கடனை நீங்கள் ${d} நாட்களுக்குள் நாளொன்றுக்கு ரூபா ${parseFloat(daily).toLocaleString()} வீதம் திருப்பிச் செலுத்த வேண்டும். எமது நிறுவனத்தைத் தெரிவு செய்தமைக்கு நன்றி.`;
                 sendWhatsApp(phone, msg);
                 showPage('trackerPage');
             });
+        }
+
+        function calcAg() {
+            let amt = parseFloat(document.getElementById('loan_amt').value) || 0;
+            let rate = parseFloat(document.getElementById('int_rate').value) || 0;
+            let sc = parseFloat(document.getElementById('serv_chg').value) || 0;
+            let days = parseInt(document.getElementById('repay_period').value) || 1;
+
+            let total = amt + (amt * rate / 100);
+            let daily = total / days;
+
+            document.getElementById('ag_handover_disp').innerText = "Rs. " + (amt - sc).toLocaleString();
+            document.getElementById('ag_daily_disp').innerText = "Rs. " + daily.toLocaleString(undefined, {maximumFractionDigits: 0});
+            document.getElementById('ag_total_disp').innerText = "Rs. " + total.toLocaleString();
         }
 
         function updateSettings() {
@@ -302,9 +314,14 @@
         }
 
         function initCharts() {
-            let ctx1 = document.getElementById('loanChart').getContext('2d');
+            let canvas1 = document.getElementById('loanChart');
+            if(!canvas1) return;
+            let ctx1 = canvas1.getContext('2d');
             loanChart = new Chart(ctx1, { type: 'doughnut', data: { labels: ['Paid', 'Balance'], datasets: [{ data: [0, 1], backgroundColor: ['#2e7d32', '#d32f2f'] }] }});
-            let ctx2 = document.getElementById('profitChart').getContext('2d');
+            
+            let canvas2 = document.getElementById('profitChart');
+            if(!canvas2) return;
+            let ctx2 = canvas2.getContext('2d');
             profitChart = new Chart(ctx2, { type: 'bar', data: { labels: ['Profit', 'Service'], datasets: [{ label: 'Revenue', data: [0, 0], backgroundColor: '#ffd600' }] }});
         }
 
@@ -316,7 +333,6 @@
             profitChart.update();
         }
 
-        // --- Helper Functions ---
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
         function showPage(id) {
             document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active-page'));
@@ -330,24 +346,17 @@
         }
         function previewPhoto(e) {
             let reader = new FileReader();
-            reader.onload = () => { currentBase64 = reader.result; document.getElementById('cust_photo_preview').src = reader.result; };
+            reader.onload = () => { 
+                currentBase64 = reader.result; 
+                document.getElementById('cust_photo_preview').src = currentBase64;
+            };
             reader.readAsDataURL(e.target.files[0]);
-        }
-        function calcAg() {
-            let l = parseFloat(document.getElementById('loan_amt').value) || 0;
-            let r = parseFloat(document.getElementById('int_rate').value) || 0;
-            let sc = parseFloat(document.getElementById('serv_chg').value) || 0;
-            let d = parseInt(document.getElementById('repay_period').value) || 1;
-            let total = l + (l * r / 100);
-            document.getElementById('ag_handover_disp').innerText = "Rs. " + (l - sc);
-            document.getElementById('ag_daily_disp').innerText = "Rs. " + (total / d).toFixed(2);
-            document.getElementById('ag_total_disp').innerText = "Rs. " + total;
         }
         function searchTable() {
             let val = document.getElementById('searchBox').value.toUpperCase();
             let rows = document.getElementById('tableBody').getElementsByTagName('tr');
-            for (let row of rows) {
-                row.style.display = row.innerText.toUpperCase().includes(val) ? "" : "none";
+            for (let i = 0; i < rows.length; i++) {
+                rows[i].style.display = rows[i].innerText.toUpperCase().includes(val) ? "" : "none";
             }
         }
     </script>
