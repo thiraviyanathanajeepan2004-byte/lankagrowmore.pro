@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LGM Finance - Official v15 (Rating & Photo)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --primary: #1b5e20; --accent: #ffd600; --bg: #f4f7f6; --whatsapp: #25D366; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; font-size: 13px; color: #333; }
+        .en-cap { text-transform: uppercase; }
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); display: flex; justify-content: center; align-items: center; z-index: 10000; }
+        .login-box { background: white; padding: 30px; border-radius: 12px; text-align: center; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .login-box input { width: 90%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; text-align: center; font-weight: bold; }
+        .app-header { background: var(--primary); color: white; padding: 15px; display: flex; align-items: center; position: sticky; top: 0; z-index: 1000; justify-content: space-between; }
+        .sidebar { position: fixed; left: -280px; top: 0; width: 260px; height: 100%; background: white; box-shadow: 5px 0 15px rgba(0,0,0,0.1); transition: 0.3s; z-index: 2000; padding: 20px; }
+        .sidebar.active { left: 0; }
+        .sidebar button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; background: #f9f9f9; text-align: left; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        .dashboard-grid { padding: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; border-bottom: 5px solid var(--primary); text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .page-content { display: none; padding: 20px; }
+        .active-page { display: block; }
+        .container { max-width: 950px; margin: auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11.5px; border: 1px solid #ddd; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .data-table th { background: var(--primary); color: white; text-transform: uppercase; }
+        .agreement-form { border: 2.5px solid #000; padding: 35px; line-height: 1.6; color: #000; background: #fff; }
+        .section-title { font-weight: bold; background: #f0f0f0; padding: 6px; margin: 12px 0; border: 1px solid #000; display: block; text-transform: uppercase; }
+        .input-line { border: none; border-bottom: 1px dashed #000; padding: 2px; font-weight: bold; background: transparent; width: 100%; box-sizing: border-box; }
+        .backup-btn { background: #333; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
+        .photo-preview { width: 80px; height: 80px; border: 2px solid var(--primary); object-fit: cover; border-radius: 5px; display: block; margin: 10px 0; }
+        .rate-badge { color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; display: inline-block; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2 style="color:var(--primary)">LGM FINANCE</h2>
+            <input type="text" id="u" class="en-cap" placeholder="USERNAME">
+            <input type="password" id="p" placeholder="PASSWORD">
+            <button onclick="login()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">LOGIN</button>
+        </div>
+    </div>
+
+    <div class="app-header no-print">
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:white; font-size:25px; cursor:pointer;">☰</button>
+        <b>LGM ENTERPRISE 2026</b>
+        <span id="liveClock"></span>
+    </div>
+
+    <div id="sidebar" class="sidebar no-print">
+        <h3 style="color:var(--primary)">நிர்வாக மெனு</h3>
+        <button onclick="showPage('dashboard')">🏠 வணிக மேலோட்டம்</button>
+        <button onclick="showPage('agreementPage')">📄 1. புதிய ஒப்பந்தம்</button>
+        <button onclick="showPage('trackerPage')">👤 2. வாடிக்கையாளர் விபரம்</button>
+        <button onclick="showPage('collectionPage')">📅 3. வசூல் பட்டியல்</button>
+        <button onclick="showPage('settingsPage')">⚙️ 4. அமைப்புகள் & Backup</button>
+        <button onclick="location.reload()" style="color:red; margin-top:50px;">🚪 வெளியேற</button>
+    </div>
+
+    <div id="dashboard" class="page-content active-page">
+        <h3>நிர்வாக மேலோட்டம் (Profit & Loss)</h3>
+        <div class="dashboard-grid">
+            <div class="stat-card">மூலதனம் <br><b id="disp_inv">Rs. 0</b></div>
+            <div class="stat-card">வழங்கிய கடன் <br><b id="disp_loan">Rs. 0</b></div>
+            <div class="stat-card">நிர்வாக வருமானம் <br><b id="disp_sc" style="color:green;">Rs. 0</b></div>
+            <div class="stat-card">வட்டி வருமானம் <br><b id="disp_profit" style="color:green;">Rs. 0</b></div>
+            <div class="stat-card">மொத்த நிலுவை <br><b id="disp_bal" style="color:red;">Rs. 0</b></div>
+        </div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
+            <div style="flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 10px;"><canvas id="loanChart"></canvas></div>
+            <div style="flex: 1; min-width: 300px; background: white; padding: 20px; border-radius: 10px;"><canvas id="profitChart"></canvas></div>
+        </div>
+    </div>
+
+    <div id="agreementPage" class="page-content">
+        <div class="container">
+            <div class="agreement-form" id="agreementArea">
+                <div style="display: flex; justify-content: space-between;">
+                    <h2>LOAN AGREEMENT</h2>
+                    <div id="photoContainer" style="text-align: center;">
+                        <img id="cust_photo_preview" src="https://via.placeholder.com/80" class="photo-preview">
+                        <input type="file" id="photo_input" accept="image/*" class="no-print" onchange="previewPhoto(event)">
+                    </div>
+                </div>
+
+                <div style="text-align: right; font-weight: bold;">
+                    ID: <input type="text" id="ag_id_display" class="input-line" style="width: 100px;" readonly> <br>
+                    Date: <span id="currentDate"></span>
+                </div>
+
+                <div class="section-title">1. வாடிக்கையாளர் தனிப்பட்ட விபரங்கள்</div>
+                முழுப் பெயர்: <input type="text" id="cust_name" class="en-cap input-line" style="width: 70%;"><br>
+                பிறந்த திகதி: <input type="date" id="cust_dob" class="input-line" style="width: 25%;" onchange="calcAge()"> 
+                வயது: <input type="text" id="cust_age" class="input-line" style="width: 10%;" readonly> 
+                தேசிய அடையாள அட்டை (NIC): <input type="text" id="cust_nic" class="en-cap input-line" style="width: 30%;"><br>
+                தொலைபேசி எண்: <input type="text" id="cust_phone" class="input-line" style="width: 40%;" placeholder="07XXXXXXXX">
+
+                <div class="section-title">2. கடன் & வட்டி விபரங்கள்</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>கடன் அளவு: <input type="number" id="loan_amt" value="10000" class="input-line" onkeyup="calcAg()"></div>
+                    <div>வட்டி விகிதம் (%): <input type="number" id="int_rate" value="10" class="input-line" onkeyup="calcAg()"></div>
+                    <div>நிர்வாக சேவை கட்டணம்: <input type="number" id="serv_chg" value="1000" class="input-line" onkeyup="calcAg()"></div>
+                    <div>காலப்பகுதி (நாட்கள்): <input type="number" id="repay_period" value="30" class="input-line" onkeyup="calcAg()"></div>
+                </div>
+
+                <table class="data-table" style="margin-top: 20px;">
+                    <tr style="background:#e3f2fd;"><td>கையளிக்கப்படும் தொகை (Loan - SC):</td><td id="ag_handover_disp" style="font-weight:bold; color:blue;">Rs. 0</td></tr>
+                    <tr style="background:#fff9c4;"><td>நாளாந்த தவணை:</td><td id="ag_daily_disp" style="font-weight:bold;">Rs. 0</td></tr>
+                    <tr style="background:#fce4ec;"><td>வட்டி மட்டும்:</td><td id="ag_int_only_disp" style="font-weight:bold;">Rs. 0</td></tr>
+                    <tr style="background:#e8f5e9;"><td>மொத்தம் செலுத்த வேண்டியது:</td><td id="ag_total_disp" style="font-weight:bold; color:green;">Rs. 0</td></tr>
+                </table>
+
+                <div class="section-title">3. பிணையாளர் விபரங்கள் (Guarantor)</div>
+                பிணையாளர் பெயர்: <input type="text" id="g_name" class="en-cap input-line" style="width: 80%;">
+                <div class="sig-box" style="display: flex; justify-content: space-between; margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+                    <div style="border-top: 1px solid #000; width: 150px; text-align: center;">கடன்தாரர்</div>
+                    <div style="border-top: 1px solid #000; width: 150px; text-align: center;">முகாமையாளர்</div>
+                </div>
+            </div>
+
+            <div class="no-print" style="margin-top: 20px; display: flex; gap: 10px;">
+                <button onclick="saveCustomer()" style="flex: 1; padding: 15px; background: var(--whatsapp); color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;">SAVE & WHATSAPP</button>
+                <button onclick="window.print()" style="flex: 1; padding: 15px; background: #333; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;">PRINT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="trackerPage" class="page-content">
+        <div class="container">
+            <h3>வாடிக்கையாளர் விபரம் & தேடல்</h3>
+            <input type="text" id="searchBox" placeholder="பெயர் அல்லது ID மூலம் தேடுக..." onkeyup="searchTable()" style="width:100%; padding:12px; margin-bottom:10px; border-radius:5px; border:2px solid var(--primary);">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Photo</th><th>ID & Name</th><th>கடன்</th><th>வசூல்</th><th>மீதி</th><th>Rating</th><th>Action</th></tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="collectionPage" class="page-content">
+        <div class="container">
+            <h3>நாளாந்த வசூல் பட்டியல்</h3>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Name</th><th>Daily Amount</th><th>Status</th></tr>
+                </thead>
+                <tbody id="collectionBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="settingsPage" class="page-content">
+        <div class="container">
+            <h3>அமைப்புகள் & Backup</h3>
+            <button onclick="alert('Firebase Sync is Active!')" class="backup-btn">📥 CLOUD SYNC ACTIVE</button>
+            <hr>
+            மூலதனம்: <input type="number" id="set_cap" value="5000000" style="width:100%; padding:10px;">
+            <button onclick="updateSettings()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; cursor:pointer;">UPDATE CAPITAL</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkxT7yrW_w8w8yzSy192wLAu6kdO7qu9E",
+            authDomain: "lgm-finance.firebaseapp.com",
+            databaseURL: "https://lgm-finance-default-rtdb.firebaseio.com",
+            projectId: "lgm-finance",
+            storageBucket: "lgm-finance.firebasestorage.app",
+            messagingSenderId: "125547607397",
+            appId: "1:125547607397:web:7f533a64e9d64f41789d8c"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let customers = [];
+        let finance = { cap: 5000000, pass: "0530" };
+        let loanChart, profitChart, currentBase64 = "";
+
+        function syncFromCloud() {
+            db.ref('customers').on('value', (snapshot) => {
+                const data = snapshot.val();
+                customers = data ? Object.values(data) : [];
+                updateNextID(); 
+                loadData();
+            });
+
+            db.ref('finance').on('value', (snapshot) => {
+                if(snapshot.val()) {
+                    finance = snapshot.val();
+                    document.getElementById('set_cap').value = finance.cap;
+                }
+            });
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+
+        function showPage(id) {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active-page'));
+            document.getElementById(id).classList.add('active-page');
+            if(window.innerWidth < 768) toggleSidebar();
+        }
+
+        function login() {
+            if(document.getElementById('u').value.toUpperCase() === "LGM2026" && document.getElementById('p').value === finance.pass) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('currentDate').innerText = new Date().toISOString().split('T')[0];
+                syncFromCloud();
+                calcAg();
+                setInterval(() => { document.getElementById('liveClock').innerText = new Date().toLocaleTimeString(); }, 1000);
+            } else { alert("தவறான Username அல்லது Password!"); }
+        }
+
+        function previewPhoto(event) {
+            let reader = new FileReader();
+            reader.onload = function() {
+                currentBase64 = reader.result;
+                document.getElementById('cust_photo_preview').src = currentBase64;
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+
+        function updateNextID() { document.getElementById('ag_id_display').value = "LGM/" + (530 + customers.length); }
+
+        function calcAge() {
+            let dob = new Date(document.getElementById('cust_dob').value);
+            let age = new Date(Date.now() - dob.getTime()).getUTCFullYear() - 1970;
+            document.getElementById('cust_age').value = age || 0;
+        }
+
+        function calcAg() {
+            let l = parseFloat(document.getElementById('loan_amt').value) || 0;
+            let r = parseFloat(document.getElementById('int_rate').value) || 0;
+            let sc = parseFloat(document.getElementById('serv_chg').value) || 0;
+            let d = parseInt(document.getElementById('repay_period').value) || 1;
+            let interest = l * (r / 100);
+            let total = l + interest;
+            document.getElementById('ag_handover_disp').innerText = "Rs. " + (l - sc).toLocaleString();
+            document.getElementById('ag_daily_disp').innerText = "Rs. " + (total / d).toFixed(2);
+            document.getElementById('ag_int_only_disp').innerText = "Rs. " + interest.toFixed(2);
+            document.getElementById('ag_total_disp').innerText = "Rs. " + total.toFixed(2);
+        }
+
+        function sendWhatsApp(phone, msg) {
+            let formattedPhone = "94" + phone.substring(phone.length - 9);
+            window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        function saveCustomer() {
+            let name = document.getElementById('cust_name').value.toUpperCase();
+            let phone = document.getElementById('cust_phone').value;
+            let id = document.getElementById('ag_id_display').value;
+            if(!name || !phone) return alert("விபரங்களை பூர்த்தி செய்க!");
+            
+            let l = parseFloat(document.getElementById('loan_amt').value);
+            let d = parseInt(document.getElementById('repay_period').value);
+            let total = parseFloat(document.getElementById('ag_total_disp').innerText.replace("Rs. ", "").replace(/,/g, ""));
+            let sc = parseFloat(document.getElementById('serv_chg').value);
+
+            let newCust = { id, name, phone, loan: l, sc, total, paid: 0, daily: total/d, photo: currentBase64, lastPaidDate: "" };
+
+            db.ref('customers/' + id.replace("/", "_")).set(newCust).then(() => {
+                sendWhatsApp(phone, `LGM: Dear ${name}, Loan ${id} Approved. Total: Rs.${total.toLocaleString()}.`);
+                currentBase64 = ""; document.getElementById('cust_photo_preview').src = "https://via.placeholder.com/80";
+                showPage('trackerPage');
+            });
+        }
+
+        function collectPayment(index) {
+            let amt = prompt(`${customers[index].name} செலுத்தும் தொகை:`);
+            if(amt && !isNaN(amt)) {
+                let updatedPaid = (customers[index].paid || 0) + parseFloat(amt);
+                db.ref('customers/' + customers[index].id.replace("/", "_")).update({
+                    paid: updatedPaid,
+                    lastPaidDate: new Date().toISOString().split('T')[0]
+                });
+            }
+        }
+
+        function loadData() {
+            document.getElementById('disp_inv').innerText = "Rs. " + finance.cap.toLocaleString();
+            let tL = 0, tP = 0, tB = 0, tProfit = 0, tSC = 0;
+            let tbody = document.getElementById('tableBody');
+            let cbody = document.getElementById('collectionBody');
+            tbody.innerHTML = ""; cbody.innerHTML = "";
+            let today = new Date().toISOString().split('T')[0];
+
+            customers.forEach((c, i) => {
+                let bal = c.total - c.paid;
+                tL += c.loan; tP += c.paid; tB += bal; tProfit += (c.total - c.loan); tSC += c.sc;
+                let rateVal = c.total > 0 ? ((c.paid / c.total) * 10).toFixed(1) : 0;
+                let rateColor = rateVal > 7 ? "#00c853" : (rateVal > 4 ? "#ffab00" : "#ff1744");
+                
+                tbody.innerHTML += `<tr>
+                    <td><img src="${c.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;"></td>
+                    <td><b>${c.id}</b><br>${c.name}</td>
+                    <td>${c.total.toLocaleString()}</td>
+                    <td style="color:green">+${c.paid.toLocaleString()}</td>
+                    <td style="color:red">${bal.toFixed(0)}</td>
+                    <td><span class="rate-badge" style="background:${rateColor}">${rateVal}/10</span></td>
+                    <td><button onclick="collectPayment(${i})" style="background:var(--whatsapp); color:white; border:none; padding:6px; cursor:pointer; border-radius:4px;">PAY</button></td>
+                </tr>`;
+                
+                if(bal > 0) {
+                    let status = c.lastPaidDate === today ? '<span style="color:green">PAID ✅</span>' : `<button onclick="collectPayment(${i})" style="background:var(--primary); color:white; border:none; padding:5px; border-radius:3px; cursor:pointer;">COLLECT</button>`;
+                    cbody.innerHTML += `<tr><td>${c.name}</td><td>Rs. ${c.daily.toFixed(0)}</td><td>${status}</td></tr>`;
+                }
+            });
+
+            document.getElementById('disp_loan').innerText = "Rs. " + tL.toLocaleString();
+            document.getElementById('disp_profit').innerText = "Rs. " + tProfit.toLocaleString();
+            document.getElementById('disp_sc').innerText = "Rs. " + tSC.toLocaleString();
+            document.getElementById('disp_bal').innerText = "Rs. " + tB.toLocaleString();
+            updateCharts(tL, tB, tProfit, tSC);
+        }
+
+        function updateCharts(loan, balance, profit, sc) {
+            const ctx1 = document.getElementById('loanChart').getContext('2d');
+            const ctx2 = document.getElementById('profitChart').getContext('2d');
+
+            if (loanChart) loanChart.destroy();
+            if (profitChart) profitChart.destroy();
+
+            loanChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Paid', 'Balance'],
+                    datasets: [{ data: [loan - balance, balance], backgroundColor: ['#1b5e20', '#ff1744'] }]
+                },
+                options: { plugins: { title: { display: true, text: 'Loan Recovery Status' } } }
+            });
+
+            profitChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Interest', 'Service Charge'],
+                    datasets: [{ label: 'Revenue', data: [profit, sc], backgroundColor: ['#ffd600', '#25D366'] }]
+                },
+                options: { plugins: { title: { display: true, text: 'Revenue Analysis' } } }
+            });
+        }
+
+        function updateSettings() {
+            let newCap = parseFloat(document.getElementById('set_cap').value);
+            db.ref('finance').update({ cap: newCap }).then(() => alert("Capital Updated!"));
+        }
+
+        function searchTable() {
+            let input = document.getElementById("searchBox").value.toUpperCase();
+            let rows = document.getElementById("tableBody").getElementsByTagName("tr");
+            for (let i = 0; i < rows.length; i++) {
+                rows[i].style.display = rows[i].innerText.toUpperCase().includes(input) ? "" : "none";
+            }
+        }
+    </script>
+</body>
+</html>
