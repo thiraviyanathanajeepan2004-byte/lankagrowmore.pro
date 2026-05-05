@@ -213,6 +213,23 @@
             document.getElementById(id).classList.add('active-page');
             if(document.getElementById('sidebar').classList.contains('active')) toggleSidebar();
             if(id === 'dashboard') { generateFinancialStatement(); updateChartsUI(); }
+            if(id === 'agreementPage') { generateNextID(); }
+        }
+
+        // Logic for auto-incrementing ID starting from LGM/532
+        function generateNextID() {
+            if(customers.length === 0) {
+                document.getElementById('ag_id_display').value = "LGM/532";
+                return;
+            }
+            
+            let ids = customers.map(c => {
+                let parts = c.id.split('/');
+                return parts.length > 1 ? parseInt(parts[1]) : 0;
+            }).filter(n => !isNaN(n));
+
+            let maxID = Math.max(...ids, 531);
+            document.getElementById('ag_id_display').value = "LGM/" + (maxID + 1);
         }
 
         function login() {
@@ -225,7 +242,6 @@
             } else { alert("தவறான தரவு!"); }
         }
 
-        // Charts Logic
         function initCharts() {
             const ctx1 = document.getElementById('loanChart').getContext('2d');
             loanChart = new Chart(ctx1, { type: 'doughnut', data: { labels: ['செலுத்தியது', 'மீதி'], datasets: [{ data: [0, 1], backgroundColor: ['#2e7d32', '#d32f2f'] }] }});
@@ -236,49 +252,79 @@
         function updateChartsUI() {
             let tL=0, tP=0, tProfit=0, tSC=0;
             customers.forEach(c => { tL+=c.loan; tP+=c.paid; tProfit+=(c.total-c.loan); tSC+=c.sc; });
-            let finalP = finance.manualProfit > 0 ? finance.manualProfit : tProfit;
+            let finalP = (finance.manualProfit > 0) ? parseInt(finance.manualProfit) : tProfit;
+            let finalSC = (finance.manualSC > 0) ? parseInt(finance.manualSC) : tSC;
             
             if(loanChart) {
                 loanChart.data.datasets[0].data = [tP, (tL - tP > 0 ? tL - tP : 0)];
                 loanChart.update();
             }
             if(profitChart) {
-                profitChart.data.datasets[0].data = [finance.cap, tL, (finalP + tSC)];
+                profitChart.data.datasets[0].data = [finance.cap, tL, (finalP + finalSC)];
                 profitChart.update();
             }
         }
 
-        // Customer Details Modal
-        function showCustomerDetail(cid) {
-            let c = customers.find(x => x.id === cid);
-            if(!c) return;
-            
-            let dob = c.dob || "N/A";
-            let nic = c.nic || "N/A";
-            let sc = c.sc || 0;
-            let profit = (c.total - c.loan);
-
-            document.getElementById('customerFullInfo').innerHTML = `
-                <center><img src="${c.photo || 'https://via.placeholder.com/100'}" style="width:100px; height:100px; border-radius:10px; border:2px solid var(--primary); object-fit:cover;"></center>
-                <h3 style="text-align:center; color:var(--primary); margin:10px 0;">${c.name}</h3>
-                <div class="detail-row"><span>கடன் இலக்கம் (ID):</span> <b>${c.id}</b></div>
-                <div class="detail-row"><span>தேசிய அடையாள அட்டை (NIC):</span> <b>${nic}</b></div>
-                <div class="detail-row"><span>தொலைபேசி எண்:</span> <b>${c.phone}</b></div>
-                <div class="detail-row"><span>பிறந்த திகதி:</span> <b>${dob}</b></div>
-                <div class="detail-row"><span>வயது:</span> <b>${c.age || 'N/A'}</b></div>
-                <hr>
-                <div class="detail-row"><span>கடன் அளவு (Loan):</span> <b>Rs. ${c.loan.toLocaleString()}</b></div>
-                <div class="detail-row"><span>வட்டி (Interest):</span> <b>Rs. ${profit.toLocaleString()}</b></div>
-                <div class="detail-row"><span>நிர்வாக சேவை கட்டணம்:</span> <b>Rs. ${sc.toLocaleString()}</b></div>
-                <div class="detail-row" style="color:green"><span>செலுத்திய பணம்:</span> <b>Rs. ${c.paid.toLocaleString()}</b></div>
-                <div class="detail-row" style="color:red; font-weight:bold;"><span>மிகுதி (Balance):</span> <b>Rs. ${(c.total - c.paid).toLocaleString()}</b></div>
-            `;
-            document.getElementById('detailModal').style.display = 'flex';
+        function previewPhoto(event) {
+            let reader = new FileReader();
+            reader.onload = function(){
+                currentBase64 = reader.result;
+                document.getElementById('cust_photo_preview').src = currentBase64;
+            };
+            reader.readAsDataURL(event.target.files[0]);
         }
 
-        function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
+        function calcAge() {
+            let dob = new Date(document.getElementById('cust_dob').value);
+            let diff = Date.now() - dob.getTime();
+            let ageDate = new Date(diff);
+            document.getElementById('cust_age').value = Math.abs(ageDate.getUTCFullYear() - 1970);
+        }
 
-        // Core Functions
+        function calcAg() {
+            let amt = parseFloat(document.getElementById('loan_amt').value) || 0;
+            let rate = parseFloat(document.getElementById('int_rate').value) || 0;
+            let sc = parseFloat(document.getElementById('serv_chg').value) || 0;
+            let days = parseInt(document.getElementById('repay_period').value) || 1;
+
+            let total = amt + (amt * rate / 100);
+            document.getElementById('ag_handover_disp').innerText = "Rs. " + (amt - sc).toLocaleString();
+            document.getElementById('ag_daily_disp').innerText = "Rs. " + (total / days).toFixed(2);
+            document.getElementById('ag_total_disp').innerText = "Rs. " + total.toLocaleString();
+        }
+
+        function saveCustomer() {
+            let id = document.getElementById('ag_id_display').value;
+            let name = document.getElementById('cust_name').value;
+            let loan = parseFloat(document.getElementById('loan_amt').value);
+            let rate = parseFloat(document.getElementById('int_rate').value);
+            let total = loan + (loan * rate / 100);
+            
+            if(!name) { alert("பெயரை உள்ளிடவும்!"); return; }
+
+            let data = {
+                id: id,
+                name: name,
+                nic: document.getElementById('cust_nic').value,
+                phone: document.getElementById('cust_phone').value,
+                dob: document.getElementById('cust_dob').value,
+                age: document.getElementById('cust_age').value,
+                loan: loan,
+                sc: parseFloat(document.getElementById('serv_chg').value),
+                total: total,
+                paid: 0,
+                photo: currentBase64,
+                date: new Date().toLocaleDateString()
+            };
+
+            db.ref('customers/' + id.replace('/','-')).set(data).then(() => {
+                alert("சேமிக்கப்பட்டது!");
+                currentBase64 = "";
+                document.getElementById('cust_photo_preview').src = "https://via.placeholder.com/80";
+                showPage('trackerPage');
+            });
+        }
+
         function syncFromCloud() {
             db.ref('customers').on('value', (snap) => {
                 customers = snap.val() ? Object.values(snap.val()) : [];
@@ -288,11 +334,7 @@
             db.ref('finance').on('value', (snap) => {
                 if(snap.val()) { 
                     finance = snap.val(); 
-                    document.getElementById('set_cap').value = finance.cap;
-                    document.getElementById('set_profit').value = finance.manualProfit || 0;
-                    document.getElementById('set_sc').value = finance.manualSC || 0;
-                    document.getElementById('set_pass').value = finance.pass;
-                    loadData();
+                    document.getElementById('disp_inv').innerText = "Rs. " + parseInt(finance.cap).toLocaleString();
                 }
             });
         }
@@ -310,129 +352,61 @@
                 autoSC += (c.sc || 0);
 
                 tbody.innerHTML += `
-                    <tr onclick="showCustomerDetail('${c.id}')" style="cursor:pointer">
-                        <td><img src="${c.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;"></td>
-                        <td><b>${c.id}</b><br>${c.name}</td>
+                    <tr>
+                        <td onclick="showCustomerDetail('${c.id}')"><img src="${c.photo || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;"></td>
+                        <td onclick="showCustomerDetail('${c.id}')"><b>${c.id}</b><br>${c.name}</td>
                         <td>${c.total.toLocaleString()}</td>
                         <td style="color:green">${(c.paid || 0).toLocaleString()}</td>
                         <td style="color:red">${bal.toLocaleString()}</td>
-                        <td><button onclick="event.stopPropagation(); collectPayment('${c.id.replace("/","_")}')">PAY</button></td>
-                    </tr>`;
+                        <td><button onclick="payPrompt('${c.id}')" style="background:green; color:white; border:none; padding:5px 10px; border-radius:3px;">PAY</button></td>
+                    </tr>
+                `;
 
                 if(bal > 0) {
-                    cbody.innerHTML += `<tr><td>${c.name}</td><td>Rs. ${c.daily.toFixed(0)}</td><td><button onclick="collectPayment('${c.id.replace("/","_")}')">PAY</button></td></tr>`;
+                    cbody.innerHTML += `<tr><td>${c.name}</td><td>${(c.total/30).toFixed(0)}</td><td><button onclick="payPrompt('${c.id}')">வசூலி</button></td></tr>`;
                 }
             });
 
-            let finalProfit = (finance.manualProfit > 0) ? parseFloat(finance.manualProfit) : autoProfit;
-            let finalSC = (finance.manualSC > 0) ? parseFloat(finance.manualSC) : autoSC;
-
-            document.getElementById('disp_inv').innerText = "Rs. " + parseFloat(finance.cap).toLocaleString();
             document.getElementById('disp_loan').innerText = "Rs. " + tL.toLocaleString();
-            document.getElementById('disp_profit').innerText = "Rs. " + finalProfit.toLocaleString();
-            document.getElementById('disp_sc').innerText = "Rs. " + finalSC.toLocaleString();
             document.getElementById('disp_bal').innerText = "Rs. " + tB.toLocaleString();
+            document.getElementById('disp_profit').innerText = "Rs. " + (finance.manualProfit > 0 ? parseInt(finance.manualProfit) : autoProfit).toLocaleString();
+            document.getElementById('disp_sc').innerText = "Rs. " + (finance.manualSC > 0 ? parseInt(finance.manualSC) : autoSC).toLocaleString();
         }
 
-        // Utility Functions
-        function calcAge() {
-            let dob = document.getElementById('cust_dob').value;
-            if(!dob) return;
-            let year = new Date(dob).getFullYear();
-            document.getElementById('cust_age').value = new Date().getFullYear() - year;
-        }
-
-        function previewPhoto(event) {
-            let reader = new FileReader();
-            reader.onload = function() {
-                document.getElementById('cust_photo_preview').src = reader.result;
-                currentBase64 = reader.result;
-            };
-            reader.readAsDataURL(event.target.files[0]);
-        }
-
-        function calcAg() {
-            let amt = parseFloat(document.getElementById('loan_amt').value) || 0;
-            let rate = parseFloat(document.getElementById('int_rate').value) || 0;
-            let sc = parseFloat(document.getElementById('serv_chg').value) || 0;
-            let days = parseInt(document.getElementById('repay_period').value) || 1;
-            let total = amt + (amt * rate / 100);
-            document.getElementById('ag_handover_disp').innerText = "Rs. " + (amt - sc).toLocaleString();
-            document.getElementById('ag_daily_disp').innerText = "Rs. " + (total / days).toLocaleString(undefined, {maximumFractionDigits:0});
-            document.getElementById('ag_total_disp').innerText = "Rs. " + total.toLocaleString();
-        }
-
-        function collectPayment(dbId) {
-            let amtInput = prompt("செலுத்தப்பட்ட தொகையை உள்ளிடவும்:");
-            if(amtInput && !isNaN(amtInput)) {
-                let c = customers.find(x => x.id.replace("/","_") === dbId);
-                let paidAmt = parseFloat(amtInput);
-                let newPaidTotal = (c.paid || 0) + paidAmt;
-                db.ref('customers/' + dbId).update({ paid: newPaidTotal }).then(() => alert("பணம் வசூலிக்கப்பட்டது!"));
+        function payPrompt(cid) {
+            let amt = prompt("செலுத்த வேண்டிய தொகையை உள்ளிடவும்:");
+            if(amt) {
+                let c = customers.find(x => x.id === cid);
+                let newPaid = (c.paid || 0) + parseFloat(amt);
+                db.ref('customers/' + cid.replace('/','-')).update({ paid: newPaid });
             }
         }
 
-        function saveCustomer() {
-            let name = document.getElementById('cust_name').value.toUpperCase();
-            let phone = document.getElementById('cust_phone').value;
-            if(!name || !phone) return alert("விபரங்களை பூர்த்தி செய்க!");
-            
-            let id = "LGM-" + Math.floor(1000 + Math.random() * 9000);
-            let loan = parseFloat(document.getElementById('loan_amt').value);
-            let total = parseFloat(document.getElementById('ag_total_disp').innerText.replace("Rs. ", "").replace(/,/g, ""));
-            let days = parseInt(document.getElementById('repay_period').value);
-            
-            let data = {
-                id, name, phone, loan, total,
-                sc: parseFloat(document.getElementById('serv_chg').value),
-                daily: total / days,
-                paid: 0,
-                photo: currentBase64,
-                dob: document.getElementById('cust_dob').value,
-                nic: document.getElementById('cust_nic').value,
-                age: document.getElementById('cust_age').value
-            };
-
-            db.ref('customers/' + id.replace("-", "_")).set(data).then(() => {
-                alert("ஒப்பந்தம் சேமிக்கப்பட்டது! ID: " + id);
-                showPage('trackerPage');
-            });
+        function showCustomerDetail(cid) {
+            let c = customers.find(x => x.id === cid);
+            if(!c) return;
+            document.getElementById('customerFullInfo').innerHTML = `
+                <center><img src="${c.photo || 'https://via.placeholder.com/100'}" style="width:100px; height:100px; border-radius:10px; object-fit:cover;"></center>
+                <h3 style="text-align:center;">${c.name}</h3>
+                <div class="detail-row"><span>ID:</span> <b>${c.id}</b></div>
+                <div class="detail-row"><span>NIC:</span> <b>${c.nic}</b></div>
+                <div class="detail-row"><span>Phone:</span> <b>${c.phone}</b></div>
+                <div class="detail-row"><span>Loan:</span> <b>Rs. ${c.loan}</b></div>
+                <div class="detail-row"><span>Balance:</span> <b style="color:red">Rs. ${c.total - c.paid}</b></div>
+            `;
+            document.getElementById('detailModal').style.display = 'flex';
         }
+
+        function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
 
         function updateSettings() {
-            let updates = {
-                cap: parseFloat(document.getElementById('set_cap').value),
-                manualProfit: parseFloat(document.getElementById('set_profit').value),
-                manualSC: parseFloat(document.getElementById('set_sc').value),
+            let f = {
+                cap: document.getElementById('set_cap').value,
+                manualProfit: document.getElementById('set_profit').value,
+                manualSC: document.getElementById('set_sc').value,
                 pass: document.getElementById('set_pass').value
             };
-            db.ref('finance').update(updates).then(() => alert("அமைப்புகள் மாற்றப்பட்டது!"));
-        }
-
-        function downloadReport() {
-            const element = document.getElementById('statementTable');
-            const opt = { margin: 1, filename: 'LGM_Finance_Report.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-            html2pdf().set(opt).from(element).save();
-        }
-
-        function generateFinancialStatement() {
-            const now = new Date();
-            let tL=0, tP=0, tProfit=0, tSC=0;
-            customers.forEach(c => { tL+=c.loan; tP+=c.paid; tProfit+=(c.total-c.loan); tSC+=c.sc; });
-            let finalP = (finance.manualProfit > 0) ? parseFloat(finance.manualProfit) : tProfit;
-
-            document.getElementById('statementTable').innerHTML = `
-                <div style="padding:20px; border:1px solid #000; font-family:arial;">
-                    <center><h2>LGM FINANCE - அறிக்கை</h2></center>
-                    <p>திகதி: ${now.toLocaleDateString()}</p>
-                    <table style="width:100%; border-collapse:collapse;" border="1">
-                        <tr><td style="padding:8px;">மூலதனம்</td><td>Rs. ${finance.cap.toLocaleString()}</td></tr>
-                        <tr><td style="padding:8px;">வழங்கிய கடன்</td><td>Rs. ${tL.toLocaleString()}</td></tr>
-                        <tr><td style="padding:8px;">வட்டி வருவாய்</td><td>Rs. ${finalP.toLocaleString()}</td></tr>
-                        <tr><td style="padding:8px;">நிர்வாக வருவாய் (SC)</td><td>Rs. ${tSC.toLocaleString()}</td></tr>
-                        <tr style="background:#eee; font-weight:bold;"><td style="padding:8px;">நிகர லாபம்</td><td>Rs. ${(finalP + tSC).toLocaleString()}</td></tr>
-                    </table>
-                </div>`;
+            db.ref('finance').set(f).then(() => alert("அமைப்புகள் புதுப்பிக்கப்பட்டன!"));
         }
 
         function searchTable() {
